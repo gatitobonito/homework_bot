@@ -33,18 +33,18 @@ formatter = logging.Formatter(
 
 logger = logging.StreamHandler()
 logger.setStream(sys.stdout)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 logger.setFormatter(formatter)
 
-logger.debug('Новых статусов нет')
-logger.info('Сообщение отправлено')
-logger.warning('Большая нагрузка!')
-logger.error('Бот не смог отправить сообщение')
-logger.critical('Отсутствуют переменные окружения!')
+# logger.debug('Новых статусов нет')
+# logger.info('Сообщение отправлено')
+# logger.warning('Большая нагрузка!')
+# logger.error('Бот не смог отправить сообщение')
+# logger.critical('Отсутствуют переменные окружения!')
 
 def send_message(bot, message):
     """Отправка сообщения пользователю."""
-    bot.send_message(TELEGRAM_CHAT_ID, HOMEWORK_STATUSES[message])
+    bot.send_message(TELEGRAM_CHAT_ID, message)
 
 
 def get_api_answer(current_timestamp):
@@ -52,18 +52,20 @@ def get_api_answer(current_timestamp):
     timestamp = current_timestamp or int(time.time())
     params = {'from_date': timestamp}
 
-    check_response(requests.get(ENDPOINT, headers=HEADERS, params=params))
+    response = requests.get(ENDPOINT, headers=HEADERS, params=params).json()
+    return response
 #     логируем словарь, распаковываем словарь
 
 
 def check_response(response):
     """Проверка ответа API Практикум.Домашка на корректность."""
-    resp_list = response.get('homeworks')
+    resp_list = response['homeworks']
     if isinstance(resp_list, list):
         logging.info('В ответе получен валидный список')
         return resp_list[0]
     else:
         logging.error('В ответе не список')
+        raise Exception
 
 
 def parse_status(homework):
@@ -86,16 +88,11 @@ def check_tokens():
 def main():
     """Основная логика работы бота."""
 
-    # main_logger = logging.getLogger()
-    # main_logger.setLevel(logging.INFO)
-
     check_tokens()
     old_status ={}
     current_status={}
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     current_timestamp = int(time.time()-30*24*60*60)
-
-    get_api_answer(current_timestamp)
 
     while True:
         try:
@@ -103,15 +100,18 @@ def main():
 
             resp = check_response(response)
             message = parse_status(resp)
-            send_message(bot, message)
-            current_timestamp = int(time.time())
+           # send_message(bot, message)
+            current_status = message
+            current_timestamp = resp.get('current_date')
             if current_status != old_status:
                 send_message(bot, current_status)
+                old_status = current_status
             time.sleep(RETRY_TIME)
 
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
             send_message(bot, message)
+            logger.error(message)
             time.sleep(RETRY_TIME)
         else:
             ...
