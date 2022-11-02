@@ -43,13 +43,6 @@ stream_handler = logging.StreamHandler(sys.stdout)
 stream_handler.setFormatter(formatter)
 logger.addHandler(stream_handler)
 
-
-# logger.debug('Новых статусов нет')
-# logger.info('Сообщение отправлено')
-# logger.warning('Большая нагрузка!')
-# logger.error('Бот не смог отправить сообщение')
-# logger.critical('Отсутствуют переменные окружения!')
-
 def send_message(bot, message):
     """Отправка сообщения пользователю."""
     bot.send_message(TELEGRAM_CHAT_ID, message)
