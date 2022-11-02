@@ -1,1 +1,3 @@
-# class EmptyAPIResponseError(тут букавки)
+class EmptyAPIResponseError(Exception):
+    pass
+
