@@ -45,13 +45,15 @@ def send_message(bot, message):
 
 
 def get_api_answer(current_timestamp):
-    """Запрос к API Практикум.Домашка"""
+    """Запрос к API Практикум.Домашка."""
     timestamp = current_timestamp or int(time.time())
     params = {'from_date': timestamp}
     try:
         response = requests.get(ENDPOINT, headers=HEADERS, params=params)
-        if response.status_code != HTTPStatus.OK:
+        if response.status_code == HTTPStatus.NO_CONTENT:
             raise EmptyAPIResponseError('Пустой ответ от API')
+        elif response.status_code != HTTPStatus.OK:
+            raise KeyError(f'ответ от API {response.status_code}')
         return response.json()
     except Exception:
         raise ConnectionError('Ошибка запроса к API Практикум')
@@ -63,6 +65,9 @@ def check_response(response):
     if not isinstance(resp_list, list):
         logger.error('В ответе не список')
         raise TypeError('В ответе не список')
+    elif resp_list == []:
+        logger.error('В ответе пустой список')
+        raise KeyError('В ответе пустой список')
     else:
         logger.info('В ответе получен валидный список')
         return resp_list
@@ -76,8 +81,8 @@ def parse_status(homework):
         raise KeyError('В ответе не найдено имя')
     if homework_status is None:
         raise KeyError('В ответе не найден статус')
-    # if HOMEWORK_STATUSES[homework_status] is None:
-    #     raise KeyError('Пустой список')
+    if HOMEWORK_STATUSES[homework_status] is None:
+        raise KeyError('Пустой список')
     try:
         verdict = HOMEWORK_STATUSES[homework_status]
         logger.info('Статус работы получен')
@@ -89,7 +94,7 @@ def parse_status(homework):
 def check_tokens():
     """Проверка доступности переменных окружения."""
     tokens = [PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID]
-    return all(x is not None for x in tokens)
+    return all(tokens)
 
 
 def main():
@@ -100,8 +105,6 @@ def main():
     old_status = ''
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     current_timestamp = int(time.time())
-    # -30*24*60*60)
-
     while True:
         try:
             response = get_api_answer(current_timestamp)
@@ -117,9 +120,10 @@ def main():
                 logger.debug('Статус не изменился')
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
-            send_message(bot, message)
+            if old_status != message:
+                send_message(bot, message)
+                old_status = message
             logger.error(message)
-            time.sleep(RETRY_TIME)
         finally:
             time.sleep(RETRY_TIME)
 
