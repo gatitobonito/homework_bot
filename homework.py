@@ -120,7 +120,7 @@ def main():
         raise ValueError('С переменными окружения что-то не так')
     old_status = ''
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
-    current_timestamp = int(time.time()-60*60*24*7)
+    current_timestamp = int(time.time())
     while True:
         try:
             response = get_api_answer(current_timestamp)
