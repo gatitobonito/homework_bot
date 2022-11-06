@@ -4,3 +4,5 @@ class APIResponseError(Exception):
 class HTTPStatusError(Exception):
     pass
 
+class CheckTokenError(Exception):
+    pass

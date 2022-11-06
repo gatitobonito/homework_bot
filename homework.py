@@ -5,7 +5,7 @@ import sys
 import telegram
 import time
 
-from exceptions import APIResponseError, HTTPStatusError
+from exceptions import APIResponseError, CheckTokenError, HTTPStatusError
 from dotenv import load_dotenv
 from http import HTTPStatus
 from telegram import TelegramError
@@ -58,21 +58,17 @@ def get_api_answer(current_timestamp):
             logger.error(f'Ответ от API {response.status_code}')
             raise HTTPStatusError(f'Ответ от API {response.status_code}')
         resp_json = response.json()
-        resp_set = set()
-        for k in resp_json.keys():
-            resp_set.add(k)
-        if resp_set == {'error', 'code'}:
-            resp_error = resp_json['error']
-            resp_code = resp_json['code']
-            raise APIResponseError(
-                f'Ошибка в ответе сервера: {resp_error}, код:{resp_code}'
-            )
+        error_keys = {'error', 'code'}
+        for k in error_keys:
+            if k in list(resp_json):
+                resp_error = resp_json['error']
+                resp_code = resp_json['code']
+                raise APIResponseError(
+                    f'Ошибка {resp_error}, код:{resp_code}'
+                )
         return resp_json
     except requests.RequestException as exc:
         logger.error(f'Ошибка {exc}')
-        raise requests.RequestException('Ошибка запроса к API Практикум')
-    except requests.ConnectionError:
-        logger.error('Ошибка подключения к API Практикум')
         raise requests.ConnectionError('Ошибка подключения к API Практикум')
 
 
@@ -117,7 +113,7 @@ def main():
     """Основная логика работы бота."""
     if not check_tokens():
         logger.critical('С переменными окружения что-то не так')
-        raise ValueError('С переменными окружения что-то не так')
+        raise CheckTokenError('С переменными окружения что-то не так')
     old_status = ''
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     current_timestamp = int(time.time())
