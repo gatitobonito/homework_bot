@@ -5,7 +5,6 @@ import sys
 import telegram
 import time
 
-
 from exceptions import APIResponseError, HTTPStatusError
 from dotenv import load_dotenv
 from http import HTTPStatus
@@ -66,7 +65,7 @@ def get_api_answer(current_timestamp):
             resp_error = resp_json['error']
             resp_code = resp_json['code']
             raise APIResponseError(
-                f'Ошибка в ответе сервера: error:{resp_error} ,code:{resp_code}'
+                f'Ошибка в ответе сервера: {resp_error}, код:{resp_code}'
             )
         return resp_json
     except requests.RequestException as exc:
@@ -112,6 +111,7 @@ def check_tokens():
         if not globals()[name]:
             return False
     return True
+
 
 def main():
     """Основная логика работы бота."""
