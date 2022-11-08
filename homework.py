@@ -5,10 +5,11 @@ import sys
 import telegram
 import time
 
-from exceptions import APIResponseError, CheckTokenError, HTTPStatusError
 from dotenv import load_dotenv
 from http import HTTPStatus
 from telegram import TelegramError
+
+from exceptions import APIResponseError, CheckTokenError, HTTPStatusError
 
 load_dotenv()
 
@@ -39,16 +40,16 @@ stream_handler.setFormatter(formatter)
 logger.addHandler(stream_handler)
 
 
-def send_message(bot, message):
+def send_message(bot, message)->None:
     """Отправка сообщения пользователю."""
     try:
         bot.send_message(TELEGRAM_CHAT_ID, message)
-        logger.info('Сообщение отправлено в Телеграмм')
+        logger.info(f'Сообщение отправлено в Телеграмм: {message}')
     except TelegramError:
-        logger.error('Не удалось отправить сообщение в Telegram')
+        logger.error(f'Не удалось отправить в Telegram сообщение: {message}')
 
 
-def get_api_answer(current_timestamp):
+def get_api_answer(current_timestamp)->dict:
     """Запрос к API Практикум.Домашка."""
     timestamp = current_timestamp or int(time.time())
     params = {'from_date': timestamp}
@@ -56,7 +57,9 @@ def get_api_answer(current_timestamp):
         response = requests.get(ENDPOINT, headers=HEADERS, params=params)
         if response.status_code != HTTPStatus.OK:
             logger.error(f'Ответ от API {response.status_code}')
-            raise HTTPStatusError(f'Ответ от API {response.status_code}')
+            raise HTTPStatusError(
+                msg='код ответа от API:', code=response.status_code
+            )
         resp_json = response.json()
         error_keys = {'error', 'code'}
         for k in error_keys:
@@ -64,7 +67,7 @@ def get_api_answer(current_timestamp):
                 resp_error = resp_json['error']
                 resp_code = resp_json['code']
                 raise APIResponseError(
-                    f'Ошибка {resp_error}, код:{resp_code}'
+                    msg=resp_error, code=resp_code
                 )
         return resp_json
     except requests.RequestException as exc:
@@ -72,7 +75,7 @@ def get_api_answer(current_timestamp):
         raise requests.ConnectionError('Ошибка подключения к API Практикум')
 
 
-def check_response(response):
+def check_response(response)->list:
     """Проверка ответа API Практикум.Домашка на корректность."""
     if not isinstance(response, dict):
         logger.error('В ответе не словарь')
@@ -89,19 +92,19 @@ def check_response(response):
     return resp_list
 
 
-def parse_status(homework):
+def parse_status(homework)->str:
     """Извлекает из ответа о домашней работе ее статус."""
     homework_name = homework['homework_name']
     homework_status = homework['status']
     if HOMEWORK_STATUSES[homework_status] is None:
-        logger.error('В ответе нет статуса работы')
-        raise KeyError('Незнакомый статус')
+        logger.error(f'В ответе нет статуса работы: {homework_status}')
+        raise KeyError(f'Незнакомый статус: {homework_status}')
     verdict = HOMEWORK_STATUSES[homework_status]
     logger.info('Статус работы получен')
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
 
-def check_tokens():
+def check_tokens()->bool:
     """Проверка доступности переменных окружения."""
     for name in TOKEN_NAMES:
         if not globals()[name]:
@@ -109,11 +112,13 @@ def check_tokens():
     return True
 
 
-def main():
+def main()->None:
     """Основная логика работы бота."""
     if not check_tokens():
         logger.critical('С переменными окружения что-то не так')
-        raise CheckTokenError('С переменными окружения что-то не так')
+        raise CheckTokenError(
+            msg='С переменными окружения что-то не так'
+        )
     old_status = ''
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     current_timestamp = int(time.time())
@@ -121,10 +126,13 @@ def main():
         try:
             response = get_api_answer(current_timestamp)
             resp = check_response(response)
-            message = parse_status(resp[0])
+            if not resp:
+                message = 'Обновлений статуса домашки нет'
+            else:
+                message = parse_status(resp[0])
+                current_timestamp = resp[0].get('current_date')
             if message is None:
                 raise KeyError('Получен пустой список')
-            current_timestamp = resp[0].get('current_date')
             if old_status != message:
                 send_message(bot, message)
                 old_status = message

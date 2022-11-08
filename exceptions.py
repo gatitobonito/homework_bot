@@ -1,8 +1,16 @@
-class APIResponseError(Exception):
+class BaseError(Exception):
+    def __init__(self, msg, code):
+        self.msg = msg
+        self.code = code
+
+
+class APIResponseError(BaseError):
     pass
 
-class HTTPStatusError(Exception):
+
+class HTTPStatusError(BaseError):
     pass
 
-class CheckTokenError(Exception):
+
+class CheckTokenError(BaseError):
     pass
