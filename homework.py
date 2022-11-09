@@ -40,7 +40,7 @@ stream_handler.setFormatter(formatter)
 logger.addHandler(stream_handler)
 
 
-def send_message(bot, message)->None:
+def send_message(bot, message) -> None:
     """Отправка сообщения пользователю."""
     try:
         bot.send_message(TELEGRAM_CHAT_ID, message)
@@ -49,42 +49,42 @@ def send_message(bot, message)->None:
         logger.error(f'Не удалось отправить в Telegram сообщение: {message}')
 
 
-def get_api_answer(current_timestamp)->dict:
+def get_api_answer(current_timestamp: int) -> int:
     """Запрос к API Практикум.Домашка."""
     timestamp = current_timestamp or int(time.time())
     params = {'from_date': timestamp}
     try:
         response = requests.get(ENDPOINT, headers=HEADERS, params=params)
-        if response.status_code != HTTPStatus.OK:
-            logger.error(f'Ответ от API {response.status_code}')
-            raise HTTPStatusError(
-                msg='код ответа от API:', code=response.status_code
-            )
-        resp_json = response.json()
+    except requests.RequestException as exc:
+        logger.error(f'Ошибка {exc}')
+        raise requests.ConnectionError('Ошибка подключения к API Практикум')
+    resp_json = response.json()
+    if response.status_code != HTTPStatus.OK:
         error_keys = {'error', 'code'}
         for k in error_keys:
             if k in list(resp_json):
                 resp_error = resp_json['error']
                 resp_code = resp_json['code']
+                logger.error(f'Ответ от API {resp_error},{resp_code}')
                 raise APIResponseError(
                     msg=resp_error, code=resp_code
                 )
-        return resp_json
-    except requests.RequestException as exc:
-        logger.error(f'Ошибка {exc}')
-        raise requests.ConnectionError('Ошибка подключения к API Практикум')
+        logger.error(f'Ответ от API {response.status_code}')
+        raise HTTPStatusError(
+            msg='код ответа от API:', code=response.status_code
+        )
+    return resp_json
 
 
-def check_response(response)->list:
+def check_response(response: dict) -> list:
     """Проверка ответа API Практикум.Домашка на корректность."""
     if not isinstance(response, dict):
         logger.error('В ответе не словарь')
         raise TypeError('В ответе не словарь')
-    try:
-        resp_list = response['homeworks']
-    except KeyError:
+    if "homeworks" not in response:
         logger.error('В словаре нет ключа homeworks')
         raise KeyError('В словаре нет ключа homeworks')
+    resp_list = response['homeworks']
     if not isinstance(resp_list, list):
         logger.error('В ответе не список')
         raise TypeError('В ответе не список')
@@ -92,11 +92,11 @@ def check_response(response)->list:
     return resp_list
 
 
-def parse_status(homework)->str:
+def parse_status(homework: dict) -> str:
     """Извлекает из ответа о домашней работе ее статус."""
     homework_name = homework['homework_name']
     homework_status = homework['status']
-    if HOMEWORK_STATUSES[homework_status] is None:
+    if homework_status not in HOMEWORK_STATUSES:
         logger.error(f'В ответе нет статуса работы: {homework_status}')
         raise KeyError(f'Незнакомый статус: {homework_status}')
     verdict = HOMEWORK_STATUSES[homework_status]
@@ -104,7 +104,7 @@ def parse_status(homework)->str:
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
 
-def check_tokens()->bool:
+def check_tokens() -> bool:
     """Проверка доступности переменных окружения."""
     for name in TOKEN_NAMES:
         if not globals()[name]:
@@ -112,7 +112,7 @@ def check_tokens()->bool:
     return True
 
 
-def main()->None:
+def main() -> None:
     """Основная логика работы бота."""
     if not check_tokens():
         logger.critical('С переменными окружения что-то не так')
