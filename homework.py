@@ -10,6 +10,7 @@ from http import HTTPStatus
 from telegram import TelegramError
 
 from exceptions import APIResponseError, CheckTokenError, HTTPStatusError
+from exceptions import NoHomeworkStatusInResponse
 
 load_dotenv()
 
@@ -62,7 +63,7 @@ def get_api_answer(current_timestamp: int) -> int:
     if response.status_code != HTTPStatus.OK:
         error_keys = {'error', 'code'}
         for k in error_keys:
-            if k in list(resp_json):
+            if k in resp_json:
                 resp_error = resp_json['error']
                 resp_code = resp_json['code']
                 logger.error(f'Ответ от API {resp_error},{resp_code}')
@@ -98,7 +99,9 @@ def parse_status(homework: dict) -> str:
     homework_status = homework['status']
     if homework_status not in HOMEWORK_STATUSES:
         logger.error(f'В ответе нет статуса работы: {homework_status}')
-        raise KeyError(f'Незнакомый статус: {homework_status}')
+        raise NoHomeworkStatusInResponse(
+            msg=f'Незнакомый статус: {homework_status}', code=''
+        )
     verdict = HOMEWORK_STATUSES[homework_status]
     logger.info('Статус работы получен')
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
@@ -108,6 +111,7 @@ def check_tokens() -> bool:
     """Проверка доступности переменных окружения."""
     for name in TOKEN_NAMES:
         if not globals()[name]:
+            logger.critical(f'Переменная {name} не найдена')
             return False
     return True
 
@@ -115,9 +119,8 @@ def check_tokens() -> bool:
 def main() -> None:
     """Основная логика работы бота."""
     if not check_tokens():
-        logger.critical('С переменными окружения что-то не так')
         raise CheckTokenError(
-            msg='С переменными окружения что-то не так'
+            msg='Переменная не найдена', code=''
         )
     old_status = ''
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
@@ -130,9 +133,9 @@ def main() -> None:
                 message = 'Обновлений статуса домашки нет'
             else:
                 message = parse_status(resp[0])
-                current_timestamp = resp[0].get('current_date')
-            if message is None:
-                raise KeyError('Получен пустой список')
+                current_timestamp = resp[0].get(
+                    'current_date', current_timestamp
+                )
             if old_status != message:
                 send_message(bot, message)
                 old_status = message

@@ -14,3 +14,6 @@ class HTTPStatusError(BaseError):
 
 class CheckTokenError(BaseError):
     pass
+
+class NoHomeworkStatusInResponse(BaseError):
+    pass
